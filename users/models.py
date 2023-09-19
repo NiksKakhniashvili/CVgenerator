@@ -32,18 +32,27 @@ class CustomUser(AbstractUser):
         unique=False,
         blank=True,
         null=True)
-    email = models.EmailField(max_length=100, unique=True)
+    email = models.EmailField(max_length=150, unique=True)
 
     objects = CustomUserManager()
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
     def __str__(self):
-        return self.username
+        return self.email
 
 
 class Profile(models.Model):
+
+    LEVEL = (
+        ("junior", "Junior"),
+        ("middle", "Middle"),
+        ("senior", "Senior"),
+    )
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    first_name = models.CharField(_("first name"), max_length=150, blank=True)
+    last_name = models.CharField(_("last name"), max_length=150, blank=True)
+    level = models.CharField(_("level"), choices=LEVEL, null=True)
+    birth_date = models.DateField(_("birth date"), null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
-
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
