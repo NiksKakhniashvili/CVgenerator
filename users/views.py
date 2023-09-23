@@ -1,10 +1,18 @@
+import os
+
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+from dj_rest_auth.registration.views import SocialLoginView
 from rest_framework import status
 from rest_framework.generics import GenericAPIView, RetrieveAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.serializers import UserRegistrationSerializer, CustomUserSerializer, ProfileSerializer
+from users.serializers import (
+    UserRegistrationSerializer,
+    CustomUserSerializer,
+    ProfileSerializer, )
 
 
 class UserRegistrationAPIView(GenericAPIView):
@@ -39,10 +47,23 @@ class UserAPIView(RetrieveAPIView):
 
 class ProfileAPIView(RetrieveAPIView):
     """
-    Get user information
+    Get user Profile information
     """
     permission_classes = (IsAuthenticated,)
     serializer_class = ProfileSerializer
 
     def get_object(self):
         return self.request.user
+
+
+class GoogleLoginView(SocialLoginView):
+    adapter_class = GoogleOAuth2Adapter
+    callback_url = os.environ.get("CALLBACK_URL")
+    client_class = OAuth2Client
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            token = RefreshToken.for_user(self.user)
+            response.data["tokens"] = {"refresh": str(token), "access": str(token.access_token)}
+        return response
