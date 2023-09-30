@@ -11,13 +11,22 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.serializers import (
     UserRegistrationSerializer,
-    CustomUserSerializer,
-    ProfileSerializer, )
+    CustomUserSerializer, )
 
 
 class UserRegistrationAPIView(GenericAPIView):
     """
-    An endpoint for the client to create a new User.
+        An endpoint for the client to create a new User.
+
+        This view allows unauthenticated users to create a new user account.
+
+        Required Permissions:
+        - None (AllowAny)
+
+        Returns:
+        - 201 Created: The new user account is successfully created, and authentication tokens are provided.
+        - 400 Bad Request: Invalid data provided in the request.
+
     """
 
     permission_classes = (AllowAny,)
@@ -35,7 +44,17 @@ class UserRegistrationAPIView(GenericAPIView):
 
 class UserAPIView(RetrieveAPIView):
     """
-    Get user information
+        Get user information.
+
+        This view allows authenticated users to retrieve their own user information.
+
+        Required Permissions:
+        - User must be authenticated.
+
+        Returns:
+        - 200 OK: User information is successfully retrieved.
+        - 401 Unauthorized: User is not authenticated.
+
     """
 
     permission_classes = (IsAuthenticated,)
@@ -45,18 +64,21 @@ class UserAPIView(RetrieveAPIView):
         return self.request.user
 
 
-class ProfileAPIView(RetrieveAPIView):
-    """
-    Get user Profile information
-    """
-    permission_classes = (IsAuthenticated,)
-    serializer_class = ProfileSerializer
-
-    def get_object(self):
-        return self.request.user
-
-
 class GoogleLoginView(SocialLoginView):
+    """
+       Login with Google account.
+
+       This view allows users to log in using their Google account credentials.
+
+       Required Permissions:
+       - None (Open to all)
+
+       Returns:
+       - 200 OK: Login is successful, and authentication tokens are provided.
+       - 401 Unauthorized: Google authentication failed.
+       - 400 Bad Request: Invalid data provided in the request.
+
+    """
     adapter_class = GoogleOAuth2Adapter
     callback_url = os.environ.get("CALLBACK_URL")
     client_class = OAuth2Client

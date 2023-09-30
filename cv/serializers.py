@@ -1,7 +1,17 @@
 from django.db import transaction
 from rest_framework import serializers
 
-from cv.models import ProjectExperience, Resume, Skill, Percentage
+from cv.models import ProjectExperience, Resume, Skill, Percentage, ResumeTemplate
+
+
+class ResumeTemplateSerializer(serializers.ModelSerializer):
+    """
+        Serializer class to serialize Template model.
+    """
+
+    class Meta:
+        model = ResumeTemplate
+        fields = ("id", "name",)
 
 
 class PercentageSerializer(serializers.ModelSerializer):
@@ -36,7 +46,7 @@ class ProjectExperienceSerializer(serializers.ModelSerializer):
 
 class ResumeCreateSerializer(serializers.ModelSerializer):
     """
-        Serializer class to serialize Resume model.
+        Serializer class to serialize Resume model for creation.
     """
     skill_percentages = PercentageSerializer(many=True, write_only=True)
     project_experience_ids = serializers.ListField(
@@ -45,7 +55,15 @@ class ResumeCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Resume
-        fields = ("id", "user", "position", "description", "project_experience_ids", "skill_percentages")
+        fields = (
+            "id",
+            "user",
+            "position",
+            "description",
+            "project_experience_ids",
+            "skill_percentages",
+            "resume_template"
+        )
 
     def create(self, validated_data):
         skill_percentage = validated_data.pop("skill_percentages")
@@ -66,6 +84,8 @@ class ResumeCreateSerializer(serializers.ModelSerializer):
 
             Percentage.objects.bulk_create(percentage_objects)
 
+        return resume
+
     def update(self, instance, validated_data):
         validated_data.pop("user", None)
 
@@ -73,14 +93,18 @@ class ResumeCreateSerializer(serializers.ModelSerializer):
         instance.position = validated_data.get("position", instance.position)
         instance.description = validated_data.get("description", instance.description)
 
-        # Update the project experiences
         project_experience_ids = validated_data.get("project_experience_ids", [])
-        print("NIKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa")
 
+        project_experiences_to_remove = instance.project_experiences.exclude(pk__in=project_experience_ids)
+
+        for project_experience in project_experiences_to_remove:
+            instance.project_experiences.remove(project_experience)
+
+        # Add new project experiences
         for pr_exp_id in project_experience_ids:
-            existing_percentage = ProjectExperience.objects.filter(pk=pr_exp_id).first()
-            if existing_percentage:
-                instance.project_experiences.add(pr_exp_id)
+            project_experience = ProjectExperience.objects.filter(pk=pr_exp_id).first()
+            if project_experience:
+                instance.project_experiences.add(project_experience)
 
         # Update skill percentages
         skill_percentages_data = validated_data.get("skill_percentages", [])
@@ -105,6 +129,9 @@ class ResumeCreateSerializer(serializers.ModelSerializer):
 
 
 class ResumeRetrieveSerializer(serializers.ModelSerializer):
+    """
+        Serializer class to serialize Resume model for retrieval.
+    """
     skill_percentages = serializers.SerializerMethodField()
     project_experiences = ProjectExperienceSerializer(many=True, read_only=True)
 

@@ -1,65 +1,104 @@
 from django_renderpdf.views import PDFView
 from rest_framework import generics
 from rest_framework import viewsets
-from rest_framework.generics import RetrieveAPIView
-from rest_framework.mixins import UpdateModelMixin
 from rest_framework.permissions import IsAuthenticated
 
-from cv.models import Resume, ProjectExperience, Skill
+from cv.models import Resume, ProjectExperience, Skill, Percentage, ResumeTemplate
 from cv.serializers import ProjectExperienceSerializer, SkillSerializer, ResumeCreateSerializer, \
-    ResumeRetrieveSerializer
+    ResumeRetrieveSerializer, ResumeTemplateSerializer
+from users.models import CustomUser
 from utils.custom_permisions import IsOwnerOrAdmin
 
 
-class ResumeFilling(PDFView, RetrieveAPIView):
+class ResumePDFView(PDFView, generics.RetrieveAPIView):
     """
-        An endpoint for the User to retrieve a Resume/CV.
+        Generate resume to PDF file.
+
+        Required Permissions:
+            - User must be authenticated.
     """
     queryset = Resume.objects.all()
-    permission_classes = (IsAuthenticated,)
     serializer_class = ResumeRetrieveSerializer
+    permission_classes = (IsAuthenticated,)
 
-    # def get_context_data(self, **kwargs):
-    #     """Pass some extra context to the template."""
-    #     context = super().get_context_data(**kwargs)
-    #     resume = Resume.objects.get(id=kwargs["pk"])
+    def get_context_data(self, *args, **kwargs):
+        """Pass some extra context to the template."""
+
+        context = super().get_context_data(**kwargs)
+        image = ResumeTemplate.objects.get(resume=kwargs["pk"])
+        context["image"] = image.image
+        context["resume"] = Resume.objects.get(id=kwargs["pk"])
+        context["user"] = CustomUser.objects.get(resume=kwargs["pk"])
+        user = context["user"]
+        context["initials"] = user.first_name[0].upper() + "." + user.last_name[0].upper() + "."
+        context["project_experiences"] = ProjectExperience.objects.filter(experiences=kwargs["pk"])
+        context["skills"] = Percentage.objects.filter(resume=kwargs["pk"])
+
+        self.template_name = f"resumes/{context['resume'].resume_template.name}.html"
+        self.download_name = (
+            f"{context['resume'].resume_template.name}_{context['resume'].user.first_name}.pdf"
+        )
+
+        self.prompt_download = False
+
+        return context
 
 
-# @extend_schema(
-#         request=ResumeSerializer,
-#         responses={status.HTTP_201_CREATED: ResumeSerializer},
-#         examples=[
-#             OpenApiExample(
-#                 'Example',
-#                 value={
-#                     'user': 0,
-#                     'position': "position",
-#                     "description": "description",
-#                     "skill": [
-#                         {'text': 'Blue', 'is_correct': True},
-#                         {'text': 'Red', 'is_correct': False},
-#                     ]
-#                 },
-#
-#             ),
-#         ],
-#     )
+class ResumeTemplateViewset(viewsets.ModelViewSet):
+    """
+       List all resume templates.
+
+       This view allows to get all the resume templates or the id.
+
+       Returns:
+       - 200 OK: List of resumes is successfully retrieved.
+       - 401 Unauthorized: User is not authenticated.
+
+    """
+
+    queryset = ResumeTemplate.objects.all()
+    serializer_class = ResumeTemplateSerializer
+    http_method_names = ["get"]
+    permission_classes = (IsAuthenticated,)
+
+
 class ResumeCreateView(generics.CreateAPIView):
     """
+       Create a new resume.
+
+       Required Permissions:
+       - User must be authenticated.
+
+       Returns:
+       - 201 Created: The new resume is successfully created.
+       - 401 Unauthorized: User is not authenticated.
+       - 400 Bad Request: Invalid data provided.
     """
     queryset = Resume.objects.all()
     serializer_class = ResumeCreateSerializer
-    permission_classes = (IsAuthenticated, )
-
-    # def get_permissions(self):
-    #     if self.request.method != "POST":
-    #         return [IsOwnerOrAdmin()]
-    #     return super().get_permissions()
+    permission_classes = (IsAuthenticated,)
 
 
 class ResumeUpdateView(generics.UpdateAPIView):
+    """
+        Update an existing resume.
+
+        This view allows authenticated users to update their own resumes.
+
+        Required Permissions:
+        - User must be authenticated.
+        - User must be the owner of the resume or a superuser.
+
+        Returns:
+        - 200 OK: The resume is successfully updated.
+        - 401 Unauthorized: User is not authenticated.
+        - 403 Forbidden: User does not have permission to update this resume.
+        - 404 Not Found: Resume with the specified ID does not exist.
+        - 400 Bad Request: Invalid data provided.
+    """
+
     serializer_class = ResumeCreateSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = (IsAuthenticated, IsOwnerOrAdmin)
 
     def get_queryset(self):
         resume_id = self.kwargs.get("pk")
@@ -67,14 +106,40 @@ class ResumeUpdateView(generics.UpdateAPIView):
 
 
 class ResumeListView(generics.ListAPIView):
+    """
+        List all resumes.
+
+        This view allows to get all the resumes.
+
+        Returns:
+        - 200 OK: List of resumes is successfully retrieved.
+        - 401 Unauthorized: User is not authenticated.
+
+    """
     queryset = Resume.objects.all()
     serializer_class = ResumeRetrieveSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = (IsAuthenticated, IsOwnerOrAdmin)
 
 
 class ResumeDetailView(generics.RetrieveDestroyAPIView):
+    """
+        Retrieve or delete a resume.
+
+        This view allows authenticated users to retrieve or delete their own resumes.
+
+        Required Permissions:
+        - User must be authenticated.
+        - User must be the owner of the resume or a superuser.
+
+        Returns:
+        - 200 OK: Resume is successfully retrieved.
+        - 204 No Content: Resume is successfully deleted.
+        - 401 Unauthorized: User is not authenticated.
+        - 403 Forbidden: User does not have permission to access/delete this resume.
+        - 404 Not Found: Resume with the specified ID does not exist.
+    """
     serializer_class = ResumeRetrieveSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = (IsAuthenticated, IsOwnerOrAdmin)
 
     def get_queryset(self):
         resume_id = self.kwargs.get("pk")
@@ -83,14 +148,46 @@ class ResumeDetailView(generics.RetrieveDestroyAPIView):
 
 class ProjectExperienceViewset(viewsets.ModelViewSet):
     """
+        Manage project experiences.
+
+        This viewset allows authenticated users to manage project experiences.
+
+        Required Permissions:
+        - User must be authenticated.
+
+        Returns:
+        - 200 OK: List of project experiences is successfully retrieved.
+        - 201 Created: New project experience is successfully created.
+        - 200 OK: Project experience is successfully updated.
+        - 204 No Content: Project experience is successfully deleted.
+        - 401 Unauthorized: User is not authenticated.
+
     """
     queryset = ProjectExperience.objects.all()
     serializer_class = ProjectExperienceSerializer
-    http_method_names = ["get", "post", "patch", "delete"]
-    permission_classes = (IsAuthenticated, )
+    http_method_names = ["get", "post", "patch"]
+    permission_classes = (IsAuthenticated,)
 
 
 class SkillViewset(viewsets.ModelViewSet):
+    """
+       Manage skills.
+
+       This viewset allows authenticated users to manage skills.
+
+       Required Permissions:
+       - User must be authenticated.
+
+       Returns:
+       - 200 OK: List of skills is successfully retrieved.
+       - 201 Created: New skill is successfully created.
+       - 200 OK: Skill is successfully updated.
+       - 204 No Content: Skill is successfully deleted.
+       - 401 Unauthorized: User is not authenticated.
+
+    """
+
     queryset = Skill.objects.all()
     serializer_class = SkillSerializer
-
+    http_method_names = ["get", "post", "patch", "delete"]
+    permission_classes = (IsAuthenticated,)

@@ -1,7 +1,12 @@
 from django.core.validators import MaxValueValidator
 from django.db import models
 
-from users.models import CustomUser, Profile
+from users.models import CustomUser
+
+
+class ResumeTemplate(models.Model):
+    name = models.CharField(max_length=150)
+    html_file = models.FileField(upload_to="resume_templates/", blank=True, null=True)
 
 
 class Percentage(models.Model):
@@ -20,6 +25,7 @@ class Resume(models.Model):
     description = models.TextField()
     skill = models.ManyToManyField("Skill", related_name="skills_list")
     project_experiences = models.ManyToManyField("ProjectExperience", related_name="experiences")
+    resume_template = models.ForeignKey(ResumeTemplate, on_delete=models.CASCADE)
 
 
 class ProjectExperience(models.Model):
@@ -28,4 +34,3 @@ class ProjectExperience(models.Model):
     technology = models.CharField(max_length=150)
     project_description = models.TextField()
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-
