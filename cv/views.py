@@ -25,8 +25,6 @@ class ResumePDFView(PDFView, generics.RetrieveAPIView):
         """Pass some extra context to the template."""
 
         context = super().get_context_data(**kwargs)
-        image = ResumeTemplate.objects.get(resume=kwargs["pk"])
-        context["image"] = image.image
         context["resume"] = Resume.objects.get(id=kwargs["pk"])
         context["user"] = CustomUser.objects.get(resume=kwargs["pk"])
         user = context["user"]
@@ -34,12 +32,16 @@ class ResumePDFView(PDFView, generics.RetrieveAPIView):
         context["project_experiences"] = ProjectExperience.objects.filter(experiences=kwargs["pk"])
         context["skills"] = Percentage.objects.filter(resume=kwargs["pk"])
 
+        # do this for html table purposes
+        for skill in context["skills"]:
+            skill.percentage *= 5
+
         self.template_name = f"resumes/{context['resume'].resume_template.name}.html"
         self.download_name = (
             f"{context['resume'].resume_template.name}_{context['resume'].user.first_name}.pdf"
         )
 
-        self.prompt_download = False
+        self.prompt_download = True
 
         return context
 
