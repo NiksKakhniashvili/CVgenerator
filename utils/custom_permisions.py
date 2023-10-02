@@ -12,6 +12,3 @@ class IsOwnerOrAdmin(permissions.BasePermission):
             if hasattr(obj, "user"):
                 return obj.user == request.user
         return False
-
-    def has_permission(self, request, view):
-        return request.user.is_superuser

@@ -120,7 +120,15 @@ class ResumeListView(generics.ListAPIView):
     """
     queryset = Resume.objects.all()
     serializer_class = ResumeRetrieveSerializer
-    permission_classes = (IsAuthenticated, IsOwnerOrAdmin)
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        try:
+            if not self.request.user.is_staff or not self.request.user.is_superuser:
+                return Resume.objects.filter(user_id=self.request.user)
+        except Exception:
+            return Resume.objects.none()
+        return super().get_queryset()
 
 
 class ResumeDetailView(generics.RetrieveDestroyAPIView):
@@ -142,10 +150,7 @@ class ResumeDetailView(generics.RetrieveDestroyAPIView):
     """
     serializer_class = ResumeRetrieveSerializer
     permission_classes = (IsAuthenticated, IsOwnerOrAdmin)
-
-    def get_queryset(self):
-        resume_id = self.kwargs.get("pk")
-        return Resume.objects.filter(pk=resume_id)
+    queryset = Resume.objects.all()
 
 
 class ProjectExperienceViewset(viewsets.ModelViewSet):
