@@ -9,7 +9,7 @@ User = get_user_model()
 class UserRegistrationAPIViewTest(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.url = "/users/register/"  # Replace with the actual URL of your registration endpoint
+        self.url = "/users/register/"
         self.valid_payload = {
             "email": "test@makingscience.com",
             "password": "test",
